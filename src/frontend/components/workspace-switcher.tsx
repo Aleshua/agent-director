@@ -1,17 +1,32 @@
 "use client";
 
-import { useSyncExternalStore, type ChangeEvent } from "react";
+import { Plus, X } from "lucide-react";
+import { useState, useSyncExternalStore } from "react";
 
 import {
+    SidebarGroup,
+    SidebarGroupAction,
+    SidebarGroupContent,
+    SidebarGroupLabel,
+    SidebarMenu,
+    SidebarMenuAction,
+    SidebarMenuButton,
+    SidebarMenuItem,
+} from "@/frontend/components/ui/sidebar";
+import {
     ACTIVE_WORKSPACE_ID_SESSION_KEY,
-    WORKSPACE_STATE_STORAGE_KEY,
     WORKSPACE_STATE_CHANGED_EVENT,
+    WORKSPACE_STATE_STORAGE_KEY,
     workspaceStateService,
 } from "@/frontend/services/workspace/workspace-state.service";
 
 type WorkspaceSwitcherSnapshot = {
     workspaces: ReturnType<typeof workspaceStateService.listWorkspaces>;
     activeWorkspaceId: string;
+};
+
+type DirectoryPickerWindow = Window & {
+    showDirectoryPicker?: () => Promise<{ name: string }>;
 };
 
 const SERVER_SNAPSHOT: WorkspaceSwitcherSnapshot = {
@@ -81,35 +96,94 @@ export function WorkspaceSwitcher() {
         getSnapshot,
         getServerSnapshot,
     );
+    const [isPicking, setIsPicking] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-    function handleWorkspaceSwitch(event: ChangeEvent<HTMLSelectElement>) {
-        const workspaceId = event.target.value;
-        if (!workspaceId) {
-            workspaceStateService.clearActiveWorkspace();
+    async function handleAddWorkspace() {
+        if (typeof window === "undefined") {
             return;
         }
 
+        const pickerWindow = window as DirectoryPickerWindow;
+        if (typeof pickerWindow.showDirectoryPicker !== "function") {
+            setErrorMessage("Your browser does not support system directory picker.");
+            return;
+        }
+
+        setIsPicking(true);
+        setErrorMessage(null);
+
+        try {
+            const handle = await pickerWindow.showDirectoryPicker();
+            workspaceStateService.selectWorkspaceByDirectoryName(handle.name);
+        } catch (error) {
+            if (error instanceof DOMException && error.name === "AbortError") {
+                return;
+            }
+
+            setErrorMessage("Failed to pick directory.");
+        } finally {
+            setIsPicking(false);
+        }
+    }
+
+    function handleActivateWorkspace(workspaceId: string) {
         workspaceStateService.setActiveWorkspace(workspaceId);
     }
 
+    function handleRemoveWorkspace(workspaceId: string) {
+        workspaceStateService.removeWorkspace(workspaceId);
+    }
+
     return (
-        <div className="border-sidebar-border/70 bg-sidebar-accent/30 rounded-lg border p-3">
-            <p className="mb-2 text-xs font-medium text-sidebar-foreground/70">Workspaces</p>
-            <select
-                className="border-sidebar-border bg-sidebar h-9 w-full rounded-md border px-2 text-xs"
-                value={activeWorkspaceId}
-                onChange={handleWorkspaceSwitch}
-                disabled={workspaces.length === 0}
+        <SidebarGroup className="gap-2">
+            <SidebarGroupLabel>Workspaces</SidebarGroupLabel>
+            <SidebarGroupAction
+                type="button"
+                onClick={handleAddWorkspace}
+                disabled={isPicking}
+                title="Add workspace"
             >
-                <option value="">
-                    {workspaces.length === 0 ? "No workspaces yet" : "No active workspace"}
-                </option>
-                {workspaces.map((workspace) => (
-                    <option key={workspace.id} value={workspace.id}>
-                        {workspace.directoryName}
-                    </option>
-                ))}
-            </select>
-        </div>
+                <Plus />
+            </SidebarGroupAction>
+
+            <SidebarGroupContent>
+                {errorMessage ? (
+                    <p className="border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-2 py-1 text-xs">
+                        {errorMessage}
+                    </p>
+                ) : null}
+
+                {workspaces.length === 0 ? (
+                    <p className="px-2 py-1 text-xs text-sidebar-foreground/60">
+                        No workspaces yet. Click +
+                    </p>
+                ) : (
+                    <SidebarMenu className="max-h-[104px] overflow-y-auto">
+                        {workspaces.map((workspace) => (
+                            <SidebarMenuItem key={workspace.id}>
+                                <SidebarMenuButton
+                                    type="button"
+                                    isActive={workspace.id === activeWorkspaceId}
+                                    onClick={() => handleActivateWorkspace(workspace.id)}
+                                    title={workspace.directoryName}
+                                >
+                                    <span>{workspace.directoryName}</span>
+                                </SidebarMenuButton>
+                                <SidebarMenuAction
+                                    type="button"
+                                    showOnHover
+                                    onClick={() => handleRemoveWorkspace(workspace.id)}
+                                    aria-label={`Close workspace ${workspace.directoryName}`}
+                                    title="Close workspace"
+                                >
+                                    <X />
+                                </SidebarMenuAction>
+                            </SidebarMenuItem>
+                        ))}
+                    </SidebarMenu>
+                )}
+            </SidebarGroupContent>
+        </SidebarGroup>
     );
 }

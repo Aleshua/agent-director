@@ -137,12 +137,36 @@ class WorkspaceStateService {
         return workspace;
     }
 
+    removeWorkspace(workspaceId: string) {
+        const state = this.readState();
+        const workspaceIndex = state.workspaces.findIndex((item) => item.id === workspaceId);
+        if (workspaceIndex < 0) {
+            return false;
+        }
+
+        state.workspaces.splice(workspaceIndex, 1);
+        this.writeState(state);
+
+        const activeWorkspaceId = this.readActiveWorkspaceId();
+        if (activeWorkspaceId === workspaceId) {
+            const fallbackWorkspace = state.workspaces[state.workspaces.length - 1];
+            if (fallbackWorkspace) {
+                this.writeActiveWorkspaceId(fallbackWorkspace.id);
+            } else {
+                this.clearActiveWorkspaceId();
+            }
+        }
+
+        this.emitStateChanged();
+        return true;
+    }
+
     clearActiveWorkspace() {
         if (!isBrowserEnvironment()) {
             return;
         }
 
-        window.sessionStorage.removeItem(ACTIVE_WORKSPACE_ID_SESSION_KEY);
+        this.clearActiveWorkspaceId();
         this.emitStateChanged();
     }
 
@@ -196,6 +220,14 @@ class WorkspaceStateService {
         }
 
         window.sessionStorage.setItem(ACTIVE_WORKSPACE_ID_SESSION_KEY, workspaceId);
+    }
+
+    private clearActiveWorkspaceId() {
+        if (!isBrowserEnvironment()) {
+            return;
+        }
+
+        window.sessionStorage.removeItem(ACTIVE_WORKSPACE_ID_SESSION_KEY);
     }
 
     private migrateLegacySelectionIfNeeded() {
