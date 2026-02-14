@@ -1,6 +1,7 @@
 "use client";
 
 import type { WorkspaceRecord } from "@/frontend/services/workspace/workspace-state.service";
+import { findFirstFileHandleByName } from "@/frontend/services/workspace/workspace-agent-file-search.service";
 import { workspaceStateService } from "@/frontend/services/workspace/workspace-state.service";
 
 export const WORKSPACE_PROJECT_DATA_KEY = "projectData";
@@ -15,6 +16,11 @@ export type ProjectDataFile = {
 
 export type WorkspaceProjectDataSnapshot = {
     files: ProjectDataFile[];
+};
+
+const PROJECT_DATA_FILE_SEARCH_NAMES: Record<ProjectDataFileName, readonly string[]> = {
+    "AGENTS.md": ["AGENTS.md", "AGENT.md"],
+    "CLAUDE.md": ["CLAUDE.md"],
 };
 
 function createEmptySnapshot(): WorkspaceProjectDataSnapshot {
@@ -92,35 +98,15 @@ export async function readWorkspaceProjectDataSnapshot(
     const files: ProjectDataFile[] = [];
 
     for (const fileName of PROJECT_DATA_FILE_NAMES) {
-        const candidateNames = Array.from(
-            new Set([
-                fileName,
-                fileName.toLowerCase(),
-                fileName.toUpperCase(),
-                `${fileName.slice(0, 1)}${fileName.slice(1).toLowerCase()}`,
-            ]),
+        const match = await findFirstFileHandleByName(
+            directoryHandle,
+            PROJECT_DATA_FILE_SEARCH_NAMES[fileName],
         );
-
-        let fileHandle: FileSystemFileHandle | null = null;
-
-        for (const candidateName of candidateNames) {
-            try {
-                fileHandle = await directoryHandle.getFileHandle(candidateName);
-                break;
-            } catch (error) {
-                if (error instanceof DOMException && error.name === "NotFoundError") {
-                    continue;
-                }
-
-                throw error;
-            }
-        }
-
-        if (!fileHandle) {
+        if (!match) {
             continue;
         }
 
-        const file = await fileHandle.getFile();
+        const file = await match.fileHandle.getFile();
         files.push({
             name: fileName,
             content: await file.text(),

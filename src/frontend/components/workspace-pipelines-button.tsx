@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 
 import { Button } from "@/frontend/components/ui/button";
 import { SidebarGroup, SidebarGroupContent } from "@/frontend/components/ui/sidebar";
-import { refreshWorkspaceProjectData } from "@/frontend/services/workspace/workspace-project-data.service";
 import {
     ACTIVE_WORKSPACE_ID_SESSION_KEY,
     WORKSPACE_STATE_STORAGE_KEY,
@@ -12,16 +11,16 @@ import {
     workspaceStateService,
 } from "@/frontend/services/workspace/workspace-state.service";
 
-type WorkspaceProjectDataButtonProps = {
-    onOpenProjectData: () => void;
+type WorkspacePipelinesButtonProps = {
+    onOpenPipelines: () => void;
     isActive?: boolean;
 };
 
-type WorkspaceProjectDataButtonSnapshot = ReturnType<typeof workspaceStateService.getActiveWorkspace>;
+type WorkspacePipelinesButtonSnapshot = ReturnType<typeof workspaceStateService.getActiveWorkspace>;
 
-const SERVER_SNAPSHOT: WorkspaceProjectDataButtonSnapshot = null;
+const SERVER_SNAPSHOT: WorkspacePipelinesButtonSnapshot = null;
 
-let cachedClientSnapshot: WorkspaceProjectDataButtonSnapshot = SERVER_SNAPSHOT;
+let cachedClientSnapshot: WorkspacePipelinesButtonSnapshot = SERVER_SNAPSHOT;
 let cachedClientSignature = "";
 
 function subscribe(onStoreChange: () => void) {
@@ -72,30 +71,8 @@ function getServerSnapshot() {
     return SERVER_SNAPSHOT;
 }
 
-export function WorkspaceProjectDataButton({
-    onOpenProjectData,
-    isActive,
-}: WorkspaceProjectDataButtonProps) {
+export function WorkspacePipelinesButton({ onOpenPipelines, isActive }: WorkspacePipelinesButtonProps) {
     const activeWorkspace = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-    const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-    async function handleOpenProjectData() {
-        if (!activeWorkspace) {
-            return;
-        }
-
-        setErrorMessage(null);
-
-        try {
-            if (workspaceStateService.hasWorkspaceDirectoryHandle(activeWorkspace.id)) {
-                await refreshWorkspaceProjectData(activeWorkspace.id);
-            }
-        } catch {
-            setErrorMessage("Could not refresh AGENTS.md / CLAUDE.md.");
-        }
-
-        onOpenProjectData();
-    }
 
     return (
         <SidebarGroup className="pt-0">
@@ -105,18 +82,10 @@ export function WorkspaceProjectDataButton({
                     variant={isActive ? "default" : "outline"}
                     className="w-full"
                     disabled={!activeWorkspace}
-                    onClick={() => {
-                        void handleOpenProjectData();
-                    }}
+                    onClick={onOpenPipelines}
                 >
-                    Open Project Data
+                    Open Pipelines
                 </Button>
-
-                {errorMessage ? (
-                    <p className="border-destructive/40 bg-destructive/10 text-destructive mt-2 rounded-md border px-2 py-1 text-xs">
-                        {errorMessage}
-                    </p>
-                ) : null}
             </SidebarGroupContent>
         </SidebarGroup>
     );
