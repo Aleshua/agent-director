@@ -85,6 +85,7 @@ function parseState(rawValue: string | null): WorkspaceStateSnapshot {
 
 class WorkspaceStateService {
     private migrationChecked = false;
+    private directoryHandles = new Map<string, FileSystemDirectoryHandle>();
 
     listWorkspaces() {
         return [...this.readState().workspaces];
@@ -137,6 +138,18 @@ class WorkspaceStateService {
         return workspace;
     }
 
+    setWorkspaceDirectoryHandle(workspaceId: string, directoryHandle: FileSystemDirectoryHandle) {
+        this.directoryHandles.set(workspaceId, directoryHandle);
+    }
+
+    getWorkspaceDirectoryHandle(workspaceId: string) {
+        return this.directoryHandles.get(workspaceId) ?? null;
+    }
+
+    hasWorkspaceDirectoryHandle(workspaceId: string) {
+        return this.directoryHandles.has(workspaceId);
+    }
+
     removeWorkspace(workspaceId: string) {
         const state = this.readState();
         const workspaceIndex = state.workspaces.findIndex((item) => item.id === workspaceId);
@@ -145,6 +158,7 @@ class WorkspaceStateService {
         }
 
         state.workspaces.splice(workspaceIndex, 1);
+        this.directoryHandles.delete(workspaceId);
         this.writeState(state);
 
         const activeWorkspaceId = this.readActiveWorkspaceId();

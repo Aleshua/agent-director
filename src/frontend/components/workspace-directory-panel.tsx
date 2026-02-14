@@ -9,10 +9,18 @@ import {
     SidebarGroupLabel,
 } from "@/frontend/components/ui/sidebar";
 import {
+    ACTIVE_WORKSPACE_ID_SESSION_KEY,
     WORKSPACE_STATE_STORAGE_KEY,
     WORKSPACE_STATE_CHANGED_EVENT,
     workspaceStateService,
 } from "@/frontend/services/workspace/workspace-state.service";
+
+type WorkspaceDirectoryPanelSnapshot = ReturnType<typeof workspaceStateService.getActiveWorkspace>;
+
+const SERVER_SNAPSHOT: WorkspaceDirectoryPanelSnapshot = null;
+
+let cachedClientSnapshot: WorkspaceDirectoryPanelSnapshot = SERVER_SNAPSHOT;
+let cachedClientSignature = "";
 
 function subscribe(onStoreChange: () => void) {
     if (typeof window === "undefined") {
@@ -20,7 +28,10 @@ function subscribe(onStoreChange: () => void) {
     }
 
     function handleStorage(event: StorageEvent) {
-        if (event.key !== WORKSPACE_STATE_STORAGE_KEY) {
+        if (
+            event.key !== WORKSPACE_STATE_STORAGE_KEY &&
+            event.key !== ACTIVE_WORKSPACE_ID_SESSION_KEY
+        ) {
             return;
         }
 
@@ -41,16 +52,28 @@ function subscribe(onStoreChange: () => void) {
 }
 
 function getSnapshot() {
-    return workspaceStateService.getActiveWorkspace()?.directoryName ?? null;
+    const activeWorkspace = workspaceStateService.getActiveWorkspace();
+    const signature = activeWorkspace
+        ? `${activeWorkspace.id}|${activeWorkspace.updatedAt}|${activeWorkspace.directoryName}`
+        : "none";
+
+    if (signature === cachedClientSignature) {
+        return cachedClientSnapshot;
+    }
+
+    cachedClientSignature = signature;
+    cachedClientSnapshot = activeWorkspace;
+    return cachedClientSnapshot;
 }
 
 function getServerSnapshot() {
-    return null;
+    return SERVER_SNAPSHOT;
 }
 
 export function WorkspaceDirectoryPanel() {
-    const selectedDirectory = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+    const activeWorkspace = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
+    const selectedDirectory = activeWorkspace?.directoryName ?? null;
     const directoryLabel = selectedDirectory ?? "No directory selected";
 
     return (

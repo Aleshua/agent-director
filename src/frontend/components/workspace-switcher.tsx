@@ -19,6 +19,7 @@ import {
     WORKSPACE_STATE_STORAGE_KEY,
     workspaceStateService,
 } from "@/frontend/services/workspace/workspace-state.service";
+import { refreshWorkspaceProjectData } from "@/frontend/services/workspace/workspace-project-data.service";
 
 type WorkspaceSwitcherSnapshot = {
     workspaces: ReturnType<typeof workspaceStateService.listWorkspaces>;
@@ -26,7 +27,7 @@ type WorkspaceSwitcherSnapshot = {
 };
 
 type DirectoryPickerWindow = Window & {
-    showDirectoryPicker?: () => Promise<{ name: string }>;
+    showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>;
 };
 
 const SERVER_SNAPSHOT: WorkspaceSwitcherSnapshot = {
@@ -115,7 +116,14 @@ export function WorkspaceSwitcher() {
 
         try {
             const handle = await pickerWindow.showDirectoryPicker();
-            workspaceStateService.selectWorkspaceByDirectoryName(handle.name);
+            const workspace = workspaceStateService.selectWorkspaceByDirectoryName(handle.name);
+            workspaceStateService.setWorkspaceDirectoryHandle(workspace.id, handle);
+
+            try {
+                await refreshWorkspaceProjectData(workspace.id);
+            } catch {
+                setErrorMessage("Workspace added, but AGENTS.md / CLAUDE.md could not be checked.");
+            }
         } catch (error) {
             if (error instanceof DOMException && error.name === "AbortError") {
                 return;
@@ -127,8 +135,17 @@ export function WorkspaceSwitcher() {
         }
     }
 
-    function handleActivateWorkspace(workspaceId: string) {
-        workspaceStateService.setActiveWorkspace(workspaceId);
+    async function handleActivateWorkspace(workspaceId: string) {
+        const workspace = workspaceStateService.setActiveWorkspace(workspaceId);
+        if (!workspace || !workspaceStateService.hasWorkspaceDirectoryHandle(workspaceId)) {
+            return;
+        }
+
+        try {
+            await refreshWorkspaceProjectData(workspaceId);
+        } catch {
+            setErrorMessage("Failed to refresh AGENTS.md / CLAUDE.md for this workspace.");
+        }
     }
 
     function handleRemoveWorkspace(workspaceId: string) {
@@ -165,7 +182,9 @@ export function WorkspaceSwitcher() {
                                 <SidebarMenuButton
                                     type="button"
                                     isActive={workspace.id === activeWorkspaceId}
-                                    onClick={() => handleActivateWorkspace(workspace.id)}
+                                    onClick={() => {
+                                        void handleActivateWorkspace(workspace.id);
+                                    }}
                                     title={workspace.directoryName}
                                 >
                                     <span>{workspace.directoryName}</span>
