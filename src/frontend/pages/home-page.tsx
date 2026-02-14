@@ -1,13 +1,11 @@
-import { WorkspaceDirectoryCard } from "@/frontend/components/workspace-directory-card";
-import { AppLayout } from "@/frontend/layouts/app-layout";
+import { WorkspaceDirectoryPanel } from "@/frontend/components/workspace-directory-panel";
+import { DashboardLayout } from "@/frontend/layouts/dashboard-layout";
 
-export function HomePage() {
+export function Dashboard() {
     return (
-        <AppLayout
-            title="Agent Director"
-            subtitle="Configure the working directory for your local agents."
-        >
-            <WorkspaceDirectoryCard />
-        </AppLayout>
+        <DashboardLayout sidebar={<WorkspaceDirectoryPanel />}>
+            <>
+            </>
+        </DashboardLayout>
     );
 }

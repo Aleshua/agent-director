@@ -1,5 +1,5 @@
-import { HomePage } from "@/frontend/pages/home-page";
+import { Dashboard } from "@/frontend/pages/home-page";
 
 export default function Home() {
-    return <HomePage />;
+    return <Dashboard />;
 }
