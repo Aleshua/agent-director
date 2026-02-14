@@ -3,21 +3,23 @@ import type { ReactNode } from "react";
 import {
     Sidebar,
     SidebarContent,
-    SidebarHeader,
+    SidebarFooter,
     SidebarInset,
     SidebarProvider,
 } from "@/frontend/components/ui/sidebar";
 
 type DashboardLayoutProps = {
     sidebar: ReactNode;
+    sidebarFooter?: ReactNode;
     children: ReactNode;
 };
 
-export function DashboardLayout({ sidebar, children }: DashboardLayoutProps) {
+export function DashboardLayout({ sidebar, sidebarFooter, children }: DashboardLayoutProps) {
     return (
         <SidebarProvider>
             <Sidebar>
                 <SidebarContent>{sidebar}</SidebarContent>
+                {sidebarFooter ? <SidebarFooter>{sidebarFooter}</SidebarFooter> : null}
             </Sidebar>
             <SidebarInset>
                 <div className="px-6 py-8">

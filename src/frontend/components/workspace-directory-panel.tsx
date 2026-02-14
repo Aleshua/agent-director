@@ -9,8 +9,11 @@ import {
     SidebarGroupContent,
     SidebarGroupLabel,
 } from "@/frontend/components/ui/sidebar";
-
-const STORAGE_KEY = "agent-director:selected-directory";
+import {
+    WORKSPACE_STATE_STORAGE_KEY,
+    WORKSPACE_STATE_CHANGED_EVENT,
+    workspaceStateService,
+} from "@/frontend/services/workspace/workspace-state.service";
 
 type DirectoryPickerWindow = Window & {
     showDirectoryPicker?: () => Promise<{ name: string }>;
@@ -21,16 +24,40 @@ export function WorkspaceDirectoryPanel() {
     const [isPicking, setIsPicking] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+    function syncWorkspaceState() {
+        const activeWorkspace = workspaceStateService.getActiveWorkspace();
+        setSelectedDirectory(activeWorkspace?.directoryName ?? null);
+    }
+
     useEffect(() => {
-        const savedDirectory = window.localStorage.getItem(STORAGE_KEY);
-        if (savedDirectory) {
-            setSelectedDirectory(savedDirectory);
+        syncWorkspaceState();
+
+        function handleStorage(event: StorageEvent) {
+            if (event.key !== WORKSPACE_STATE_STORAGE_KEY) {
+                return;
+            }
+
+            syncWorkspaceState();
         }
+
+        function handleWorkspaceStateChanged() {
+            syncWorkspaceState();
+        }
+
+        window.addEventListener("storage", handleStorage);
+        window.addEventListener(WORKSPACE_STATE_CHANGED_EVENT, handleWorkspaceStateChanged);
+        return () => {
+            window.removeEventListener("storage", handleStorage);
+            window.removeEventListener(
+                WORKSPACE_STATE_CHANGED_EVENT,
+                handleWorkspaceStateChanged,
+            );
+        };
     }, []);
 
     function clearSelection() {
-        setSelectedDirectory(null);
-        window.localStorage.removeItem(STORAGE_KEY);
+        workspaceStateService.clearActiveWorkspace();
+        syncWorkspaceState();
     }
 
     async function handlePickDirectory() {
@@ -49,8 +76,8 @@ export function WorkspaceDirectoryPanel() {
 
         try {
             const handle = await pickerWindow.showDirectoryPicker();
-            setSelectedDirectory(handle.name);
-            window.localStorage.setItem(STORAGE_KEY, handle.name);
+            workspaceStateService.selectWorkspaceByDirectoryName(handle.name);
+            syncWorkspaceState();
         } catch (error) {
             if (error instanceof DOMException && error.name === "AbortError") {
                 return;
